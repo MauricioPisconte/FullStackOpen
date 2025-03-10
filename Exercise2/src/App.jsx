@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
-function LineVotes({ vote }) {
+function LineVotes(data) {
+  const {vote} = data;
   return (
     <div>
       <h1>Anecdote of the day</h1>
