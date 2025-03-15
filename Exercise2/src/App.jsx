@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import personsData from './services/dataService';
+import './styles/App.css';
 
-function Filter({ filterName , handleFilterChange }){
-  return(
+function Filter({ filterName, handleFilterChange }) {
+  return (
     <div>
-      <h1>Phonebook</h1>
-      <form>
+      <form onSubmit={(e) => e.preventDefault()}>
         <div>
           filter shown: <input value={filterName} onChange={handleFilterChange} />
         </div>
@@ -13,43 +14,61 @@ function Filter({ filterName , handleFilterChange }){
   )
 }
 
+function PhoneNotification({ notification, type }) {
+  return (
+    <>
+      {notification && <div className={`notification ${type}`}>{notification}</div>}
+    </>
+  )
+}
 
-function Register({ data }) {
-  const { persons, setPersons, newName, setNewName, newNumber, setNewNumber} = data;
+function Register({ data, setNotification, setNotificationType }) {
+  const { persons, setPersons, newName, setNewName, newNumber, setNewNumber } = data;
 
-  function handleSubmit(event){
+  function handleSubmit(event) {
     event.preventDefault();
     if (newName.trim() === "") return;
     if (newNumber.trim() === "") return;
 
-    //const existe = persons.reduce((element, current) => element || (current.name === newName), false);
     const existeNombre = persons.some((element) => element.name === newName);
-    const existeNumero= persons.some((element) => element.number === newNumber);
+    const existeNumero = persons.some((element) => element.number === newNumber);
 
-    if (existeNombre){
+    if (existeNombre) {
       alert(newName + " es un nombre ya existe en la lista");
       return;
     }
 
-    if(existeNumero){
+    if (existeNumero) {
       alert(newNumber + " es un numero ya existe en la lista");
       return;
     }
-    
-    const newPerson = { name : newName, number : newNumber };
-    setPersons([...persons, newPerson]);
-    setNewNumber('');
-    setNewName('');
+
+    const newPerson = { name: newName, number: newNumber };
+
+    personsData.Create(newPerson)
+      .then((createdPerson) => {
+        setPersons((prev) => [...prev, createdPerson]);
+        setNotification(`${createdPerson.name} was added`);
+        setNotificationType('added');
+        setNewName('');
+        setNewNumber('');
+
+        setTimeout(() => {
+          setNotification(null);
+          setNotificationType('');
+        }, 5000);
+      })
+      .catch((error) => console.error("Error al crear la persona:", error));
   }
 
   function handleInputChange(event) {
-    const {name, value} = event.target;
+    const { name, value } = event.target;
 
-    if(name === 'nombre'){
+    if (name === 'nombre') {
       setNewName(value);
     }
 
-    else if(name === 'numero'){
+    else if (name === 'numero') {
       setNewNumber(value);
     }
   }
@@ -74,9 +93,9 @@ function Register({ data }) {
   );
 }
 
-function PeopleList({ filterName, people }) {
+function PeopleList({ filterName, people, handleDelete }) {
 
-  const filteredPeople = people.filter((person) => 
+  const filteredPeople = people.filter((person) =>
     person.name.toLowerCase().includes(filterName.toLowerCase())
   );
 
@@ -85,7 +104,9 @@ function PeopleList({ filterName, people }) {
       <h2>Numbers</h2>
       <ul>
         {filteredPeople.map((person) => (
-          <li key = {person.id} >{person.name} {person.number}</li>
+          <li className='userReg' key={person.id} >
+            {person.name} {person.number} <button onClick={() => handleDelete(person.id, person.name)}>Delete</button>
+          </li>
         ))}
       </ul>
     </>
@@ -93,32 +114,55 @@ function PeopleList({ filterName, people }) {
 }
 
 function App() {
+  const [persons, setPersons] = useState([]);
+  const [filterName, setFilterName] = useState('');
+  const [notification, setNotification] = useState(null);
+  const [notificationType, setNotificationType] = useState('');
 
-  const registroNumerico =
-    [
-      { name: 'Arto Hellas', number: '040-123456', id: 1 },
-      { name: 'Ada Lovelace', number: '39-44-5323523', id: 2 },
-      { name: 'Dan Abramov', number: '12-43-234345', id: 3 },
-      { name: 'Mary Poppendieck', number: '39-23-6423122', id: 4 }
-    ]
-  
+  useEffect(() => {
+    personsData.GetAll()
+      .then((data) => {
+        setPersons(data);
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+      });
+  }, []);
 
-  const [persons, setPersons] = useState(registroNumerico); 
   const [newName, setNewName] = useState('');
   const [newNumber, setNewNumber] = useState('');
-  const [filterName, setFilterName] = useState('');
 
-  const data = { persons, setPersons, newName, setNewName , newNumber, setNewNumber};
+  const dataPersonas = { persons, setPersons, newName, setNewName, newNumber, setNewNumber };
 
-  function handleFilterChange(event){
+  function handleFilterChange(event) {
     setFilterName(event.target.value);
   };
 
+  function handleDelete(id, name) {
+    const confirmDelete = window.confirm(`Delete ${name}?`);
+    if (confirmDelete) {
+      personsData.DeleteUser(id)
+        .then(() => personsData.GetAll())
+        .then((newPersonsData) => {
+          setPersons(newPersonsData);
+          setNotification(`${name} was deleted`);
+          setNotificationType('deleted');
+          setTimeout(() => {
+            setNotification(null);
+            setNotificationType('');
+          }, 5000);
+        })
+        .catch((error) => console.error("Error al eliminar la persona:", error));
+    }
+  }
+
   return (
     <div>
-      <Filter filterName={filterName} handleFilterChange = {handleFilterChange}/>
-      <Register data={data} />
-      <PeopleList filterName={filterName} people={persons} />
+      <h1>Phonebook</h1>
+      <PhoneNotification notification={notification} type={notificationType} />
+      <Filter filterName={filterName} handleFilterChange={handleFilterChange} />
+      <Register data={dataPersonas} setNotification={setNotification} setNotificationType={setNotificationType} />
+      <PeopleList filterName={filterName} people={persons} handleDelete={handleDelete} />
     </div>
   );
 }
